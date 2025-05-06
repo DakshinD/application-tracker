@@ -78,7 +78,7 @@ const formatDisplayDate = (dateString: string) => {
   if (!dateString) return "";
   
   // Handle MM/DD/YY format
-  const [month, day, year] = dateString.split('/').map(part => parseInt(part));
+  const [month, day] = dateString.split('/').map(part => parseInt(part));
   
   const months = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", 

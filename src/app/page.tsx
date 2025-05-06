@@ -10,7 +10,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -23,30 +22,6 @@ import {
 import { ChevronDown, ChevronRight, ArrowRight, Pencil, Trash2, Plus } from "lucide-react"; 
 import { ResponsiveSankey } from "@nivo/sankey";
 import { TimelineVisualization } from "../components/TimelineVisualization";
-
-// Style definitions
-const styles = {
-  statusBadge: {
-    base: "px-3 py-1.5 rounded-md font-medium",
-    applied: "bg-yellow-100 text-yellow-800",
-    onlineAssessment: "bg-blue-100 text-blue-800",
-    phone: "bg-indigo-100 text-indigo-800",
-    behavioral: "bg-purple-100 text-purple-800",
-    technical: "bg-green-100 text-green-800",
-    final: "bg-purple-100 text-purple-800",
-    offer: "bg-green-100 text-green-800",
-    rejected: "bg-red-100 text-red-800",
-    accepted: "bg-green-100 text-green-800",
-    declined: "bg-red-100 text-red-800",
-  },
-  stats: {
-    total: "text-blue-600", 
-    applied: "text-yellow-600",
-    interviews: "text-indigo-600",
-    offers: "text-green-600",
-    rejections: "text-red-600",
-  }
-};
 
 // Define application status types
 type ApplicationStatus = 
