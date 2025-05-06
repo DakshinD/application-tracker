@@ -82,31 +82,7 @@ interface Application {
   }[];
 }
 
-// Timeline statuses for table columns
-const timelineStatuses = [
-  "Applied",
-  "Online Assessment",
-  "Phone",
-  "Technical",
-  "Final",
-  "Rejected",
-  "Offer"
-];
 
-// Status color mapping
-const statusColorMap: Record<ApplicationStatus, {bg: string, text: string}> = {
-  "Applied": {bg: "#FEF9C3", text: "#854D0E"},
-  "Online Assessment": {bg: "#E0F2FE", text: "#0369A1"},
-  "Phone": {bg: "#E0E7FF", text: "#4338CA"},
-  "Behavioral": {bg: "#F3E8FF", text: "#7E22CE"},
-  "Technical": {bg: "#D1FAE5", text: "#065F46"},
-  "Final": {bg: "#FEE2E2", text: "#B91C1C"},
-  "Offer": {bg: "#D1FAE5", text: "#065F46"},
-  "Rejected": {bg: "#FEE2E2", text: "#B91C1C"},
-  "Accepted": {bg: "#D1FAE5", text: "#065F46"},
-  "Declined": {bg: "#FEE2E2", text: "#B91C1C"},
-  "Ghosted": {bg: "#FFF0B3", text: "#854D0E"}
-};
 
 // Get color for Sankey nodes based on application status
 const getNodeColor = (status: string) => {
@@ -138,9 +114,6 @@ const getNodeColor = (status: string) => {
       return "#9CA3AF"; // gray-400
   }
 };
-
-// Sample data - empty array to start with
-const sampleApplications: Application[] = [];
 
 // Helper function to create a more detailed Sankey data with counts
 const generateSankeyData = (applications: Application[]) => {
