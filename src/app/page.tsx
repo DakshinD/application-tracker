@@ -82,7 +82,11 @@ interface Application {
   }[];
 }
 
-
+// Helper for date formatting
+const formatDateForStorage = (dateStr: string) => {
+  const [year, month, day] = dateStr.split('-');
+  return `${month}/${day}/${year.slice(2)}`;
+};
 
 // Get color for Sankey nodes based on application status
 const getNodeColor = (status: string) => {
@@ -228,6 +232,9 @@ export default function HomePage() {
     currentStatus: "Applied" as ApplicationStatus,
     url: "" // New URL field
   });
+  const [jobPostingUrl, setJobPostingUrl] = useState("");
+  const [isAutofilling, setIsAutofilling] = useState(false);
+  const [autofillError, setAutofillError] = useState<string | null>(null);
   
   // Load applications from localStorage on initial render
   useEffect(() => {
@@ -598,7 +605,60 @@ export default function HomePage() {
                     />
                   </div>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="flex flex-row justify-between items-center">
+                  <div className="mr-auto">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!newApplication.url || isAutofilling}
+                      onClick={async () => {
+                        setIsAutofilling(true);
+                        setAutofillError(null);
+                        try {
+                          const res = await fetch("/api/fetch-job-info", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ url: newApplication.url }),
+                          });
+                          const data = await res.json();
+                          if (data.company || data.jobTitle || data.location) {
+                            const newApp: Application = {
+                              id: crypto.randomUUID(),
+                              ...newApplication,
+                              company: data.company || "",
+                              jobTitle: data.jobTitle || "Software Engineer",
+                              location: data.location || "",
+                              timeline: [
+                                { status: "Applied" as ApplicationStatus, date: formatDateForStorage(newApplication.dateApplied) }
+                              ]
+                            };
+                            setApplications(prev => [newApp, ...prev]);
+                            setNewApplication({
+                              company: "",
+                              jobTitle: "Software Engineer",
+                              location: "",
+                              dateApplied: new Date().toISOString().split('T')[0],
+                              currentStatus: "Applied" as ApplicationStatus,
+                              url: ""
+                            });
+                            setOpen(false);
+                          } else {
+                            setAutofillError("Could not extract job info from the posting.");
+                          }
+                        } catch (e: any) {
+                          setAutofillError(e?.message || "Failed to fetch or extract job info.");
+                        } finally {
+                          setIsAutofilling(false);
+                        }
+                      }}
+                    >
+                      {isAutofilling ? "Loading..." : "Autofill & Add"}
+                    </Button>
+                    {autofillError && (
+                      <div className="text-xs text-red-500 mt-2">{autofillError}</div>
+                    )}
+                  </div>
                   <Button type="submit">Add Application</Button>
                 </DialogFooter>
               </form>
