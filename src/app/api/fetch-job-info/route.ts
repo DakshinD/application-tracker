@@ -1,22 +1,14 @@
 import { NextRequest } from 'next/server';
 import { load } from 'cheerio';
+import chromium from '@sparticuz/chromium-min';
 import puppeteer, { Browser, Page } from 'puppeteer-core';
 
 const GEMINI_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
-// Function to get the correct Chrome executable path
-async function getChromePath() {
-  if (process.env.VERCEL) {
-    // In Vercel, we need to use the system Chrome
-    return '/usr/bin/google-chrome';
-  } else if (process.platform === 'win32') {
-    return 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  } else if (process.platform === 'darwin') {
-    return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-  } else {
-    return '/usr/bin/google-chrome';
-  }
-}
+// Use the provided Chromium tar file
+const chromiumPack = 'https://github.com/Sparticuz/chromium/releases/download/v121.0.0/chromium-v121.0.0-pack.tar';
+
+const isLocal = process.env.IS_LOCAL === 'true' || process.env.VERCEL !== '1';
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,10 +28,20 @@ export async function POST(req: NextRequest) {
 
     let browser: Browser;
     try {
-      const executablePath = await getChromePath();
+      let executablePath: string | undefined;
+      if (isLocal) {
+        executablePath = process.env.LOCAL_CHROME_PATH;
+        if (!executablePath) {
+          throw new Error('LOCAL_CHROME_PATH environment variable must be set for local development when using puppeteer-core.');
+        }
+      } else {
+        executablePath = await chromium.executablePath(chromiumPack);
+      }
+      console.log('Chromium executable path:', executablePath);
       
       browser = await puppeteer.launch({
-        args: [
+        args: isLocal ? puppeteer.defaultArgs() : [
+          ...chromium.args,
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
@@ -47,18 +49,28 @@ export async function POST(req: NextRequest) {
           '--disable-gpu',
           '--window-size=1920x1080',
         ],
+        defaultViewport: isLocal ? undefined : chromium.defaultViewport,
         executablePath,
-        headless: true,
+        headless: isLocal ? false : chromium.headless,
       });
     } catch (err) {
       console.error('Error launching browser:', err);
-      return new Response(JSON.stringify({ error: 'Error launching browser', details: err instanceof Error ? err.message : String(err) }), { status: 500 });
+      return new Response(JSON.stringify({ 
+        error: 'Error launching browser', 
+        details: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      }), { status: 500 });
     }
 
     let page: Page;
     try {
       page = await browser.newPage();
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
+      await page.setViewport({ width: 1920, height: 1080 });
+      await page.goto(url, { 
+        waitUntil: 'networkidle2', 
+        timeout: 45000 
+      });
+      
       // Wait for DOMContentLoaded and a minimum of 1s, but no more than 5s total
       await Promise.race([
         page.evaluate(() => new Promise(resolve => {
@@ -73,7 +85,11 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       console.error('Error navigating to page:', err);
       await browser.close();
-      return new Response(JSON.stringify({ error: 'Error navigating to page', details: err instanceof Error ? err.message : String(err) }), { status: 500 });
+      return new Response(JSON.stringify({ 
+        error: 'Error navigating to page', 
+        details: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      }), { status: 500 });
     }
 
     let html: string;
@@ -83,7 +99,11 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       console.error('Error extracting HTML:', err);
       await browser.close();
-      return new Response(JSON.stringify({ error: 'Error extracting HTML', details: err instanceof Error ? err.message : String(err) }), { status: 500 });
+      return new Response(JSON.stringify({ 
+        error: 'Error extracting HTML', 
+        details: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      }), { status: 500 });
     }
 
     const $ = load(html);
@@ -108,7 +128,11 @@ export async function POST(req: NextRequest) {
       console.log('Gemini API raw response:', JSON.stringify(geminiData));
     } catch (err) {
       console.error('Error calling Gemini API:', err);
-      return new Response(JSON.stringify({ error: 'Error calling Gemini API', details: err instanceof Error ? err.message : String(err) }), { status: 500 });
+      return new Response(JSON.stringify({ 
+        error: 'Error calling Gemini API', 
+        details: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined
+      }), { status: 500 });
     }
 
     // Extract the JSON from the markdown code block in the Gemini response
@@ -152,6 +176,10 @@ export async function POST(req: NextRequest) {
     return new Response(JSON.stringify(jobInfo), { status: 200 });
   } catch (err: unknown) {
     console.error('Job info extraction error:', err);
-    return new Response(JSON.stringify({ error: 'Job info extraction error', details: err instanceof Error ? err.message : String(err) }), { status: 500 });
+    return new Response(JSON.stringify({ 
+      error: 'Job info extraction error', 
+      details: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined
+    }), { status: 500 });
   }
 } 
