@@ -1,32 +1,24 @@
 import { NextRequest } from 'next/server';
 import { load } from 'cheerio';
-
-interface PuppeteerModule {
-  launch: (options: Record<string, unknown>) => Promise<PuppeteerBrowser>;
-}
-interface PuppeteerBrowser {
-  newPage: () => Promise<PuppeteerPage>;
-  close: () => Promise<void>;
-}
-interface PuppeteerPage {
-  goto: (url: string, opts: Record<string, unknown>) => Promise<void>;
-  content: () => Promise<string>;
-  evaluate: <T>(pageFunction: (...args: unknown[]) => T | Promise<T>, ...args: unknown[]) => Promise<T>;
-}
+import puppeteer, { Browser, Page } from 'puppeteer-core';
 
 const GEMINI_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
-export async function POST(req: NextRequest) {
-  let puppeteer: PuppeteerModule;
-  let chromium: unknown;
-
-  if (process.env.AWS_LAMBDA_FUNCTION_VERSION || process.env.VERCEL) {
-    chromium = (await import(/* webpackIgnore: true */ 'chrome-aws-lambda')).default;
-    puppeteer = (await import(/* webpackIgnore: true */ 'puppeteer-core')).default as unknown as PuppeteerModule;
+// Function to get the correct Chrome executable path
+async function getChromePath() {
+  if (process.env.VERCEL) {
+    // In Vercel, we need to use the system Chrome
+    return '/usr/bin/google-chrome';
+  } else if (process.platform === 'win32') {
+    return 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+  } else if (process.platform === 'darwin') {
+    return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
   } else {
-    puppeteer = (await import('puppeteer')).default as unknown as PuppeteerModule;
+    return '/usr/bin/google-chrome';
   }
+}
 
+export async function POST(req: NextRequest) {
   try {
     const { url } = await req.json();
     if (!url || typeof url !== 'string') {
@@ -42,31 +34,28 @@ export async function POST(req: NextRequest) {
       return new Response(JSON.stringify({ error: 'Missing Gemini API key' }), { status: 500 });
     }
 
-    let browser: PuppeteerBrowser;
+    let browser: Browser;
     try {
-      if (chromium) {
-        const c = chromium as Record<string, unknown>;
-        let executablePath: string | undefined = undefined;
-        if (typeof c.executablePath === 'function') {
-          executablePath = await (c.executablePath as () => Promise<string>)();
-        } else if (typeof c.executablePath === 'string') {
-          executablePath = c.executablePath;
-        }
-        browser = await puppeteer.launch({
-          args: c.args,
-          defaultViewport: c.defaultViewport,
-          executablePath,
-          headless: c.headless,
-        });
-      } else {
-        browser = await puppeteer.launch({ headless: true });
-      }
+      const executablePath = await getChromePath();
+      
+      browser = await puppeteer.launch({
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--disable-gpu',
+          '--window-size=1920x1080',
+        ],
+        executablePath,
+        headless: true,
+      });
     } catch (err) {
       console.error('Error launching browser:', err);
       return new Response(JSON.stringify({ error: 'Error launching browser', details: err instanceof Error ? err.message : String(err) }), { status: 500 });
     }
 
-    let page: PuppeteerPage;
+    let page: Page;
     try {
       page = await browser.newPage();
       await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
