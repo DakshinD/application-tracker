@@ -232,7 +232,6 @@ export default function HomePage() {
     currentStatus: "Applied" as ApplicationStatus,
     url: "" // New URL field
   });
-  const [jobPostingUrl, setJobPostingUrl] = useState("");
   const [isAutofilling, setIsAutofilling] = useState(false);
   const [autofillError, setAutofillError] = useState<string | null>(null);
   
@@ -646,8 +645,8 @@ export default function HomePage() {
                           } else {
                             setAutofillError("Could not extract job info from the posting.");
                           }
-                        } catch (e: any) {
-                          setAutofillError(e?.message || "Failed to fetch or extract job info.");
+                        } catch (e: unknown) {
+                          setAutofillError(e instanceof Error ? e.message : "Failed to fetch or extract job info.");
                         } finally {
                           setIsAutofilling(false);
                         }
