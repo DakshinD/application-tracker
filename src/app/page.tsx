@@ -235,6 +235,9 @@ export default function HomePage() {
   });
   const [isAutofilling, setIsAutofilling] = useState(false);
   const [autofillError, setAutofillError] = useState<string | null>(null);
+  const [editRowId, setEditRowId] = useState<string | null>(null);
+  const [editRowData, setEditRowData] = useState<Partial<Application>>({});
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   
   // Load applications from localStorage on initial render
   useEffect(() => {
@@ -520,6 +523,29 @@ export default function HomePage() {
   // Generate Sankey data from applications
   const sankeyData = generateSankeyData(applications);
 
+  // Handler to start editing a row
+  const handleEditRow = (app: Application) => {
+    setEditRowId(app.id);
+    setEditRowData({ ...app });
+    setEditDialogOpen(true);
+  };
+
+  // Handler to save edited row
+  const handleSaveRow = () => {
+    if (!editRowId) return;
+    setApplications(prev => prev.map(app => app.id === editRowId ? { ...app, ...editRowData } as Application : app));
+    setEditRowId(null);
+    setEditRowData({});
+    setEditDialogOpen(false);
+  };
+
+  // Handler to cancel editing
+  const handleCancelEdit = () => {
+    setEditRowId(null);
+    setEditRowData({});
+    setEditDialogOpen(false);
+  };
+
   return (
     <div className="w-full max-w-[1400px] mx-auto py-6 px-6">
       <div className="flex justify-between items-center mb-2">
@@ -763,6 +789,7 @@ export default function HomePage() {
               <TableHead className="font-medium text-xs p-3 border">Location</TableHead>
               <TableHead className="font-medium text-xs p-3 border">Date Applied</TableHead>
               <TableHead className="font-medium text-xs p-3 border">Status</TableHead>
+              <TableHead className="p-3 border">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -828,16 +855,22 @@ export default function HomePage() {
                       </span>
                     )}
                   </TableCell>
+                  <TableCell className="p-3 border">
+                    <div className="flex justify-center items-center">
+                      <Button size="sm" variant="outline" onClick={e => { e.stopPropagation(); handleEditRow(app); }} title="Edit">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
                 
                 {/* Expandable timeline row */}
                 {expandedRows[app.id] && (
                   <TableRow>
-                    <TableCell colSpan={6} className="p-0 border">
+                    <TableCell colSpan={7} className="p-0 border">
                       <div className="p-6 bg-muted/10">
                         <div className="flex items-center flex-wrap justify-between mb-4">
                           <h3 className="text-sm font-medium">Application Timeline</h3>
-                          
                           {/* Delete Application button */}
                           <Button 
                             variant="outline" 
@@ -864,7 +897,6 @@ export default function HomePage() {
                                 >
                                   <div className="font-semibold text-sm">{event.status}</div>
                                   <div className="text-xs mt-1">{formatDate(event.date)}</div>
-                                  
                                   {/* Edit/Delete controls that appear on hover */}
                                   <div className="absolute right-1 top-1 hidden group-hover:flex space-x-1 bg-white/60 dark:bg-slate-800/50 p-0.5 rounded">
                                     <button 
@@ -887,7 +919,6 @@ export default function HomePage() {
                                     >
                                       <Pencil className="h-3.5 w-3.5 text-gray-600 dark:text-gray-300" />
                                     </button>
-                                    
                                     {index !== 0 && (
                                       <button 
                                         className="p-1 rounded-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
@@ -905,7 +936,6 @@ export default function HomePage() {
                                     )}
                                   </div>
                                 </div>
-                                
                                 {index < app.timeline.length - 1 && (
                                   <div className="mx-4 flex items-center">
                                     <div className="h-[2px] w-4 bg-muted-foreground/30"></div>
@@ -916,7 +946,6 @@ export default function HomePage() {
                               </div>
                             ))}
                           </div>
-                          
                           {/* Add Stage button - moved to the right */}
                           <button
                             className="flex items-center space-x-1 px-3 py-2 rounded-md border border-dashed border-muted-foreground/50 text-sm text-muted-foreground hover:bg-muted/50 transition-colors ml-auto"
@@ -1169,6 +1198,104 @@ export default function HomePage() {
               Delete Application
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Application Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Application</DialogTitle>
+            <DialogDescription>
+              Update the details of your job application
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={e => { e.preventDefault(); handleSaveRow(); }}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="edit-company" className="text-right text-sm font-medium">
+                  Company
+                </label>
+                <input
+                  id="edit-company"
+                  name="company"
+                  value={editRowData.company || ''}
+                  onChange={e => setEditRowData(d => ({ ...d, company: e.target.value }))}
+                  className="col-span-3 flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="edit-jobTitle" className="text-right text-sm font-medium">
+                  Job Title
+                </label>
+                <input
+                  id="edit-jobTitle"
+                  name="jobTitle"
+                  value={editRowData.jobTitle || ''}
+                  onChange={e => setEditRowData(d => ({ ...d, jobTitle: e.target.value }))}
+                  className="col-span-3 flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="edit-location" className="text-right text-sm font-medium">
+                  Location
+                </label>
+                <input
+                  id="edit-location"
+                  name="location"
+                  value={editRowData.location || ''}
+                  onChange={e => setEditRowData(d => ({ ...d, location: e.target.value }))}
+                  className="col-span-3 flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="edit-dateApplied" className="text-right text-sm font-medium">
+                  Date Applied
+                </label>
+                <input
+                  id="edit-dateApplied"
+                  name="dateApplied"
+                  type="date"
+                  value={editRowData.dateApplied || ''}
+                  onChange={e => setEditRowData(d => ({ ...d, dateApplied: e.target.value }))}
+                  className="col-span-3 flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <label htmlFor="edit-status" className="text-right text-sm font-medium">
+                  Status
+                </label>
+                <select
+                  id="edit-status"
+                  name="currentStatus"
+                  value={editRowData.currentStatus || 'Applied'}
+                  onChange={e => setEditRowData(d => ({ ...d, currentStatus: e.target.value as ApplicationStatus }))}
+                  className="col-span-3 flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="Applied">Applied</option>
+                  <option value="Online Assessment">Online Assessment</option>
+                  <option value="Phone">Phone</option>
+                  <option value="Behavioral">Behavioral</option>
+                  <option value="Technical">Technical</option>
+                  <option value="Final">Final</option>
+                  <option value="Offer">Offer</option>
+                  <option value="Rejected">Rejected</option>
+                  <option value="Accepted">Accepted</option>
+                  <option value="Declined">Declined</option>
+                  <option value="Ghosted">Ghosted</option>
+                </select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={handleCancelEdit}>
+                Cancel
+              </Button>
+              <Button type="submit">Save</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

@@ -185,10 +185,18 @@ export const TimelineVisualization: React.FC<TimelineVisualizationProps> = ({ ap
       });
     });
     
-    // Create sorted array of month-year strings
+    // Helper to parse 'Month YYYY' to Date
+    const parseMonthYear = (str: string) => {
+      const [monthName, year] = str.split(' ');
+      const monthIndex = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ].indexOf(monthName);
+      return new Date(Number(year), monthIndex, 1);
+    };
     const sortedMonths = Array.from(monthsSet).sort((a, b) => {
-      const dateA = new Date(a);
-      const dateB = new Date(b);
+      const dateA = parseMonthYear(a);
+      const dateB = parseMonthYear(b);
       return dateA.getTime() - dateB.getTime();
     });
     
