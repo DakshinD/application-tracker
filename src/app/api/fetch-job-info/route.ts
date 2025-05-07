@@ -46,10 +46,16 @@ export async function POST(req: NextRequest) {
     try {
       if (chromium) {
         const c = chromium as Record<string, unknown>;
+        let executablePath: string | undefined = undefined;
+        if (typeof c.executablePath === 'function') {
+          executablePath = await (c.executablePath as () => Promise<string>)();
+        } else if (typeof c.executablePath === 'string') {
+          executablePath = c.executablePath;
+        }
         browser = await puppeteer.launch({
           args: c.args,
           defaultViewport: c.defaultViewport,
-          executablePath: typeof c.executablePath === 'function' ? await (c.executablePath as () => Promise<string>)() : c.executablePath,
+          executablePath,
           headless: c.headless,
         });
       } else {
