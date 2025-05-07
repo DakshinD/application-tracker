@@ -40,7 +40,9 @@ export async function POST(req: NextRequest) {
     let extracted = {};
     try {
       const content = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      const match = content.match(/\{[\s\S]*?\}/);
+      // Remove the ```json and ``` markers if they exist
+      const cleanContent = content.replace(/```json\n|\n```/g, '');
+      const match = cleanContent.match(/\{[\s\S]*?\}/);
       if (match) {
         extracted = JSON.parse(match[0]);
       } else {
@@ -51,7 +53,16 @@ export async function POST(req: NextRequest) {
       extracted = { error: 'Could not parse Gemini response', raw: geminiData };
     }
 
-    return new Response(JSON.stringify({ ...extracted, _debug: { html: html.slice(0, 1000), geminiData } }), { status: 200 });
+    // Only include a small portion of the HTML in the debug info
+    const debugHtml = typeof html === 'string' ? html.slice(0, 1000) : 'HTML not available';
+    
+    return new Response(JSON.stringify({ 
+      ...extracted, 
+      _debug: { 
+        html: debugHtml, 
+        geminiData 
+      } 
+    }), { status: 200 });
   } catch (err: unknown) {
     console.error('Job info extraction error:', err);
     return new Response(JSON.stringify({ 
