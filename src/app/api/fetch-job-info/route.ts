@@ -9,14 +9,18 @@ export async function POST(req: NextRequest) {
   try {
     // 1. Fetch HTML
     const { data: html } = await axios.get(url);
+    console.log('HTML length:', html.length);
+    
     // 2. Extract text
     const $ = cheerio.load(html);
     const text = $('body').text();
-    
-    // Add debug logging for API key
-    console.log('API Key exists:', !!process.env.GEMINI_API_KEY);
+    console.log('Extracted text length:', text.length);
+    console.log('First 200 chars of text:', text.slice(0, 200));
     
     // 3. Call Gemini API
+    const prompt = `Extract the company name, job title, and location from this job posting text. Respond in JSON: {"company": "...", "jobTitle": "...", "location": "..."}\n\n${text}`;
+    console.log('Prompt length:', prompt.length);
+    
     const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: 'POST',
@@ -24,22 +28,22 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           contents: [{
             parts: [{
-              text: `Extract the company name, job title, and location from this job posting text. Respond in JSON: {"company": "...", "jobTitle": "...", "location": "..."}\n\n${text}`
+              text: prompt
             }]
           }]
         })
       }
     );
 
-    // Add debug logging for response
-    console.log('Gemini API Status:', geminiRes.status);
     const geminiData = await geminiRes.json();
     console.log('Gemini API Response:', JSON.stringify(geminiData, null, 2));
-
+    
     // Try to parse the JSON from the LLM response
     let extracted = {};
     try {
       const content = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      console.log('Content from Gemini:', content);
+      
       // Remove the ```json and ``` markers if they exist
       const cleanContent = content.replace(/```json\n|\n```/g, '');
       const match = cleanContent.match(/\{[\s\S]*?\}/);
@@ -53,13 +57,11 @@ export async function POST(req: NextRequest) {
       extracted = { error: 'Could not parse Gemini response', raw: geminiData };
     }
 
-    // Only include a small portion of the HTML in the debug info
-    const debugHtml = typeof html === 'string' ? html.slice(0, 1000) : 'HTML not available';
-    
     return new Response(JSON.stringify({ 
       ...extracted, 
       _debug: { 
-        html: debugHtml, 
+        textLength: text.length,
+        promptLength: prompt.length,
         geminiData 
       } 
     }), { status: 200 });
@@ -67,11 +69,7 @@ export async function POST(req: NextRequest) {
     console.error('Job info extraction error:', err);
     return new Response(JSON.stringify({ 
       error: 'Failed to fetch or parse job posting.', 
-      details: err instanceof Error ? err.message : String(err),
-      _debug: { 
-        hasApiKey: !!process.env.GEMINI_API_KEY,
-        apiKeyLength: process.env.GEMINI_API_KEY?.length
-      }
+      details: err instanceof Error ? err.message : String(err)
     }), { status: 500 });
   }
 } 
