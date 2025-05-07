@@ -195,6 +195,7 @@ export default function HomePage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [open, setOpen] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [loadingApplications, setLoadingApplications] = useState<Record<string, boolean>>({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<{open: boolean, appId: string, timelineIndex: number}>({
     open: false, 
     appId: "", 
@@ -614,6 +615,30 @@ export default function HomePage() {
                       onClick={async () => {
                         setIsAutofilling(true);
                         setAutofillError(null);
+                        
+                        // Create a temporary ID for the loading state
+                        const tempId = crypto.randomUUID();
+                        
+                        // Add a placeholder application immediately
+                        const placeholderApp: Application = {
+                          id: tempId,
+                          company: "",
+                          jobTitle: "Loading...",
+                          location: "",
+                          dateApplied: newApplication.dateApplied,
+                          currentStatus: "Applied",
+                          url: newApplication.url, // Add URL to placeholder
+                          timeline: [
+                            { status: "Applied", date: formatDateForStorage(newApplication.dateApplied) }
+                          ]
+                        };
+                        
+                        setApplications(prev => [placeholderApp, ...prev]);
+                        setLoadingApplications(prev => ({ ...prev, [tempId]: true }));
+                        
+                        // Close the dialog immediately
+                        setOpen(false);
+                        
                         try {
                           const res = await fetch("/api/fetch-job-info", {
                             method: "POST",
@@ -621,34 +646,38 @@ export default function HomePage() {
                             body: JSON.stringify({ url: newApplication.url }),
                           });
                           const data = await res.json();
+                          
                           if (data.company || data.jobTitle || data.location) {
-                            const newApp: Application = {
-                              id: crypto.randomUUID(),
-                              ...newApplication,
-                              company: data.company || "",
-                              jobTitle: data.jobTitle || "Software Engineer",
-                              location: data.location || "",
-                              timeline: [
-                                { status: "Applied" as ApplicationStatus, date: formatDateForStorage(newApplication.dateApplied) }
-                              ]
-                            };
-                            setApplications(prev => [newApp, ...prev]);
-                            setNewApplication({
-                              company: "",
-                              jobTitle: "Software Engineer",
-                              location: "",
-                              dateApplied: new Date().toISOString().split('T')[0],
-                              currentStatus: "Applied" as ApplicationStatus,
-                              url: ""
-                            });
-                            setOpen(false);
+                            // Update the placeholder with real data
+                            setApplications(prev => prev.map(app => 
+                              app.id === tempId ? {
+                                ...app,
+                                company: data.company || "",
+                                jobTitle: data.jobTitle || "Software Engineer",
+                                location: data.location || "",
+                                url: newApplication.url // Keep the URL
+                              } : app
+                            ));
                           } else {
+                            // Remove the placeholder if no data was found
+                            setApplications(prev => prev.filter(app => app.id !== tempId));
                             setAutofillError("Could not extract job info from the posting.");
                           }
                         } catch (e: unknown) {
+                          // Remove the placeholder on error
+                          setApplications(prev => prev.filter(app => app.id !== tempId));
                           setAutofillError(e instanceof Error ? e.message : "Failed to fetch or extract job info.");
                         } finally {
                           setIsAutofilling(false);
+                          setLoadingApplications(prev => ({ ...prev, [tempId]: false }));
+                          setNewApplication({
+                            company: "",
+                            jobTitle: "Software Engineer",
+                            location: "",
+                            dateApplied: new Date().toISOString().split('T')[0],
+                            currentStatus: "Applied" as ApplicationStatus,
+                            url: ""
+                          });
                         }
                       }}
                     >
@@ -749,35 +778,55 @@ export default function HomePage() {
                       <ChevronRight className="h-5 w-5" />}
                   </TableCell>
                   <TableCell className="text-sm p-3 border truncate">
-                    {app.company}
-                  </TableCell>
-                  <TableCell className="text-sm p-3 border truncate">
-                    {app.url ? (
-                      <a 
-                        href={app.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {app.jobTitle}
-                      </a>
+                    {loadingApplications[app.id] ? (
+                      <div className="h-4 bg-muted animate-pulse rounded w-24"></div>
                     ) : (
-                      app.jobTitle
+                      app.company
                     )}
                   </TableCell>
                   <TableCell className="text-sm p-3 border truncate">
-                    {app.location}
+                    {loadingApplications[app.id] ? (
+                      <div className="h-4 bg-muted animate-pulse rounded w-32"></div>
+                    ) : (
+                      app.url ? (
+                        <a 
+                          href={app.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {app.jobTitle}
+                        </a>
+                      ) : (
+                        app.jobTitle
+                      )
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm p-3 border truncate">
+                    {loadingApplications[app.id] ? (
+                      <div className="h-4 bg-muted animate-pulse rounded w-20"></div>
+                    ) : (
+                      app.location
+                    )}
                   </TableCell>
                   <TableCell className="text-sm p-3 border">
-                    {formatDate(app.dateApplied)}
+                    {loadingApplications[app.id] ? (
+                      <div className="h-4 bg-muted animate-pulse rounded w-24"></div>
+                    ) : (
+                      formatDate(app.dateApplied)
+                    )}
                   </TableCell>
                   <TableCell className="text-sm p-3 border">
-                    <span 
-                      className={`px-3 py-1.5 rounded-md ${getStatusClass(app.currentStatus)}`}
-                    >
-                      {app.currentStatus}
-                    </span>
+                    {loadingApplications[app.id] ? (
+                      <div className="h-6 bg-muted animate-pulse rounded w-20"></div>
+                    ) : (
+                      <span 
+                        className={`px-3 py-1.5 rounded-md ${getStatusClass(app.currentStatus)}`}
+                      >
+                        {app.currentStatus}
+                      </span>
+                    )}
                   </TableCell>
                 </TableRow>
                 
